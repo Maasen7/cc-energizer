@@ -1,13 +1,26 @@
-local e=peripheral.find("BigReactors-Energizer")
-local m=peripheral.find("monitor")
+local e = peripheral.find("BigReactors-Energizer")
+local m = peripheral.find("monitor")
+local speaker = peripheral.find("speaker")
+
 m.setTextScale(2)
 
-local bgc=colors.lightGray
+local bgc = colors.lightGray
+local shownPct = 0
+local lastBeep = 0
+
 local units={FE=1,KFE=1e3,MFE=1e6,GFE=1e9,TFE=1e12,PFE=1e15,EFE=1e18}
 
 local function parseFE(t)
  local n,u=string.match(t,"([%d%.]+)%s*(%a+)")
  return (tonumber(n) or 0)*(units[u] or 1)
+end
+
+local function formatFE(n)
+ if n>=1e12 then return string.format("%.2f TFE",n/1e12) end
+ if n>=1e9 then return string.format("%.2f GFE",n/1e9) end
+ if n>=1e6 then return string.format("%.2f MFE",n/1e6) end
+ if n>=1e3 then return string.format("%.2f KFE",n/1e3) end
+ return tostring(math.floor(n)).." FE"
 end
 
 local function at(x,y,t,fg,bg)
@@ -22,28 +35,30 @@ local function center(y,t,fg,bg)
  at(math.floor((w-#t)/2)+1,y,t,fg,bg)
 end
 
-local function fill(x,y,w,bg)
- at(x,y,string.rep(" ",w),colors.black,bg)
-end
-
-local function sci(n)
- if n>=1e12 then return string.format("%.2fT",n/1e12) end
- if n>=1e9 then return string.format("%.2fG",n/1e9) end
- if n>=1e6 then return string.format("%.2fM",n/1e6) end
- if n>=1e3 then return string.format("%.2fK",n/1e3) end
- return tostring(math.floor(n))
-end
-
+-- 🌈 Gradient + animated bar
 local function bar(y,pct)
  local w,_=m.getSize()
  local x=6
  local bw=w-10
- local filled=math.floor(bw*pct)
+ local fill=math.floor(bw*pct)
 
  at(x-1,y,"[",colors.black,bgc)
+
  for i=1,bw do
-  at(x+i-1,y," ",colors.white,i<=filled and colors.lime or colors.gray)
+  local ratio=i/bw
+  local color
+
+  if ratio<0.33 then color=colors.red
+  elseif ratio<0.66 then color=colors.yellow
+  else color=colors.lime end
+
+  if i<=fill then
+   at(x+i-1,y," ",colors.white,color)
+  else
+   at(x+i-1,y," ",colors.white,colors.gray)
+  end
  end
+
  at(x+bw,y,"]",colors.black,bgc)
 end
 
@@ -59,55 +74,58 @@ while true do
  local input=e.getEnergyInsertedLastTick()
  local output=e.getEnergyExtractedLastTick()
  local on=e.getActive()
+
  local w,h=m.getSize()
  local mid=math.floor(w/2)
 
+ -- Header
  center(1,"/ ENERGIZER \\",colors.blue,bgc)
  at(3,2,string.rep("-",w-4),colors.blue,bgc)
 
+ -- Status (short black strip)
  local status=" STATUS: "..(on and "ONLINE" or "OFFLINE").." "
  local sx=math.floor((w-#status)/2)+1
- fill(sx-2,3,#status+4,colors.black)
+ at(sx-2,3,string.rep(" ",#status+4),colors.black,colors.black)
  center(3,status,on and colors.lime or colors.red,colors.black)
 
- center(5,string.format("%.0f%%",pct*100),colors.black,bgc)
- bar(7,pct)
- center(8,storedText.." / "..sci(capFE).." FE",colors.gray,bgc)
+ -- Smooth animation
+ shownPct = shownPct + (pct - shownPct) * 0.25
 
+ center(5,string.format("%.0f%%",pct*100),colors.black,bgc)
+ bar(7,shownPct)
+
+ center(8,storedText.." / "..formatFE(capFE),colors.gray,bgc)
+
+ -- Divider
  for y=10,12 do at(mid,y,"|",colors.blue,bgc) end
 
+ -- IN
  at(5,10,"IN ->",colors.blue,bgc)
- at(5,11,tostring(input),colors.blue,bgc)
- at(5,12,"FE/t",colors.gray,bgc)
+ at(5,11,formatFE(input).."/t",colors.blue,bgc)
 
- local ox=w-14
+ -- OUT
+ local ox=w-18
  at(ox,10,"OUT ->",colors.orange,bgc)
- at(ox,11,tostring(output),colors.orange,bgc)
- at(ox,12,"FE/t",colors.gray,bgc)
+ at(ox,11,formatFE(output).."/t",colors.orange,bgc)
 
- local stripW=math.min(w-10,34)
- local stripX=math.floor((w-stripW)/2)+1
- fill(stripX,h,stripW,colors.black)
-
- at(stripX+4,h,"> START",colors.lime,colors.black)
- at(mid,h,"|",colors.white,colors.black)
- at(mid+4,h,"() STOP",colors.red,colors.black)
+ -- 🔊 ALERT (no visual, sound only)
+ if input < 100000000 then
+  if os.clock()-lastBeep > 3 then
+   if speaker then
+    speaker.playSound("minecraft:block.beacon.deactivate",1,0.8)
+    sleep(0.12)
+    speaker.playSound("minecraft:block.note_block.bell",1,1.4)
+    sleep(0.12)
+    speaker.playSound("minecraft:block.note_block.bell",1,1.0)
+   end
+   lastBeep=os.clock()
+  end
+ end
 
  local timer=os.startTimer(0.5)
 
  while true do
-  local ev,_,x,y=os.pullEvent()
+  local ev=os.pullEvent()
   if ev=="timer" then break end
-
-  if ev=="monitor_touch" then
-   if y==h and x<mid then
-    e.setActive(true)
-   elseif y==h and x>mid then
-    e.setActive(false)
-   elseif x<=2 and y<=1 then
-    return
-   end
-   break
-  end
  end
 end
