@@ -1,7 +1,7 @@
 local e = peripheral.find("BigReactors-Energizer")
 local m = peripheral.find("monitor")
 
-m.setTextScale(1)
+m.setTextScale(1.5)
 
 local function center(y,text,color)
  local w,_ = m.getSize()
@@ -22,24 +22,35 @@ while true do
  local num = tonumber(string.match(en,"%d+")) or 0
  local pct = num / cap
 
- -- TITLE
+ -- TITLE (top)
  center(1,"ENERGIZER",colors.cyan)
 
- -- BIG %
- center(2,string.format("%.0f%%",pct*100))
+ -- BIG % (center focus)
+ center(3,string.format("%.0f%%",pct*100),colors.white)
 
- -- STATUS
- center(3,on and "ONLINE" or "OFFLINE", on and colors.green or colors.red)
+ -- STATUS (big + colored)
+ center(5,on and "ONLINE" or "OFFLINE", on and colors.green or colors.red)
 
- -- INPUT/OUTPUT (shortened)
- center(4,"IN:"..i.."  OUT:"..o)
+ -- INPUT / OUTPUT (bottom)
+ center(7,"IN "..i,colors.lightBlue)
+ center(8,"OUT "..o,colors.orange)
 
  local t = os.startTimer(0.5)
 
  while true do
   local ev,_,x,y = os.pullEvent()
+
   if ev=="timer" then break end
+
   if ev=="monitor_touch" then
+   -- exit corner
+   if x <= 3 and y <= 2 then
+    m.clear()
+    m.setCursorPos(1,1)
+    print("Stopped")
+    return
+   end
+
    e.setActive(not on)
    break
   end
