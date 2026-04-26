@@ -35,7 +35,6 @@ local function center(y,t,fg,bg)
  at(math.floor((w-#t)/2)+1,y,t,fg,bg)
 end
 
--- 🌈 Gradient + animated bar
 local function bar(y,pct)
  local w,_=m.getSize()
  local x=6
@@ -78,17 +77,14 @@ while true do
  local w,h=m.getSize()
  local mid=math.floor(w/2)
 
- -- Header
  center(1,"/ ENERGIZER \\",colors.blue,bgc)
  at(3,2,string.rep("-",w-4),colors.blue,bgc)
 
- -- Status (short black strip)
  local status=" STATUS: "..(on and "ONLINE" or "OFFLINE").." "
  local sx=math.floor((w-#status)/2)+1
  at(sx-2,3,string.rep(" ",#status+4),colors.black,colors.black)
  center(3,status,on and colors.lime or colors.red,colors.black)
 
- -- Smooth animation
  shownPct = shownPct + (pct - shownPct) * 0.25
 
  center(5,string.format("%.0f%%",pct*100),colors.black,bgc)
@@ -96,20 +92,18 @@ while true do
 
  center(8,storedText.." / "..formatFE(capFE),colors.gray,bgc)
 
- -- Divider
  for y=10,12 do at(mid,y,"|",colors.blue,bgc) end
 
- -- IN
  at(5,10,"IN ->",colors.blue,bgc)
  at(5,11,formatFE(input).."/t",colors.blue,bgc)
 
- -- OUT
- local ox=w-18
+ local outText=formatFE(output).."/t"
+ local ox=w-#outText-4
  at(ox,10,"OUT ->",colors.orange,bgc)
- at(ox,11,formatFE(output).."/t",colors.orange,bgc)
+ at(ox,11,outText,colors.orange,bgc)
 
- -- 🔊 ALERT (no visual, sound only)
- if input < 100000000 then
+ -- sound alert if stored buffer is below 100,000,000 FE
+ if storedFE < 100000000 then
   if os.clock()-lastBeep > 3 then
    if speaker then
     speaker.playSound("minecraft:block.beacon.deactivate",1,0.8)
